@@ -1,0 +1,16 @@
+{
+  "name": "libtoserve",
+  "version": "1.0.0",
+  "description": "A library and command line tool that facilitates creating and running locally-hosted development servers",
+  "main": "dist/index.js",
+  "author": "James Landrum",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.2.3",
+    "typescript": "^5.0.4"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch"
+  }
+}
