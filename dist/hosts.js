@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.removeHostByComment = exports.removeHost = exports.addHost = exports.writeHosts = exports.toHostsString = exports.getHosts = exports.HostEntry = void 0;
 const fs_1 = require("fs");
+const manager_1 = require("./manager");
 class HostEntry {
     address;
     host;
@@ -9,10 +10,10 @@ class HostEntry {
     constructor(address, host, comment) {
         this.address = address;
         this.host = host;
-        this.comment = comment?.startsWith('#') ? comment : `#${comment}`;
+        this.comment = comment?.startsWith('#') ? comment.slice(1) : `${comment}`;
     }
     toString() {
-        return `${this.address} ${this.host}${this.comment ? ` ${this.comment}` : ''}`;
+        return `${this.address} ${this.host}${this.comment ? `#${this.comment}` : ''}`;
     }
     static parse(entry) {
         const parsed = entry.trim().split(/\s+/g).map(it => it.trim());
@@ -25,6 +26,7 @@ class HostEntry {
         return new HostEntry(address, host, comment ? comment : undefined);
     }
 }
+
 exports.HostEntry = HostEntry;
 function getHosts(inSection) {
     const buffer = (0, fs_1.readFileSync)('/etc/hosts');
@@ -113,6 +115,7 @@ function addHost(address, host, comment, section) {
     else {
         writeHosts([...hosts, entry]);
     }
+    (0, manager_1.notifyUpdate)();
     return true;
 }
 exports.addHost = addHost;
@@ -126,6 +129,7 @@ function removeHost(address, host) {
     if (filtered.length === hosts.length)
         return false;
     writeHosts(filtered);
+    (0, manager_1.notifyUpdate)();
     return true;
 }
 exports.removeHost = removeHost;
@@ -139,6 +143,7 @@ function removeHostByComment(comment) {
     if (filtered.length === hosts.length)
         return false;
     writeHosts(filtered);
+    (0, manager_1.notifyUpdate)();
     return true;
 }
 exports.removeHostByComment = removeHostByComment;

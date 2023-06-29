@@ -1,6 +1,16 @@
 import { spawnSync } from "child_process";
 import { readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "fs";
 
+import drupal from '../configs/nginx/drupal';
+import proxy from '../configs/nginx/proxy';
+import wordpress from '../configs/nginx/wordpress';
+import php from '../configs/nginx/php';
+import { execParams } from "../util";
+
+const siteTypes: any = {
+  drupal, proxy, wordpress, php
+}
+
 export interface SiteProperties {
   hostName: string;
   [key: string]: string;
@@ -8,43 +18,40 @@ export interface SiteProperties {
 
 export function getVersion(): string|false
 {
-  const exec = spawnSync('nginx', ['-v'], { stdio: 'pipe' })
-  if (exec.status != 0) {
+  try {
+    return spawnSync('nginx', ['-v'], execParams).stderr.toString().split('/')[1].trim();
+  } catch {
     return false;
   }
-  const version = exec.output.toString().split('/')[1].trim();
-  return version;
 }
 
 export function restart(): boolean
 {
-  const exec = spawnSync('brew', ['services', 'restart', 'nginx']);
+  const exec = spawnSync('brew', ['services', 'restart', 'nginx'], execParams);
   return exec.status ? false : true;
 } 
 
 export function test(): boolean
 {
-  const exec = spawnSync('nginx', ['-t']);
+  const exec = spawnSync('nginx', ['-t'], execParams);
   return exec.status ? false : true;
 }
 
 export function configDir(): string|false
 {
-  if (!getVersion()) return false;
-  const exec = spawnSync('nginx', ['-t'], { stdio: 'pipe' })
-  if (exec.status != 0) {
+  try {
+    const exec = spawnSync('nginx', ['-t'], execParams)
+    const configFile = exec.stderr.toString().split("\n").find(it => it.includes('the configuration file'))!!.split(" ")[4];
+    return configFile.split("/").filter((_,i,a) => i!=a.length-1).join('/');
+  } catch {
     return false;
   }
-  const configFile = exec.output.toString().split("\n")[0].split(" ")[4];
-  const configPath = configFile.split("/").filter((_,i,a) => i!=a.length-1).join('/');
-
-  return configPath;
 }
 
 export function getSites()
 {
   const dir = configDir();
-  if (!dir) return false;
+  if (!dir) return [];
   return readdirSync(`${dir}/servers`);
 }
 
@@ -54,8 +61,7 @@ export function addSite(type: string, name: string, properties: SiteProperties, 
   let template = '';
 
   try {
-    const path = type.startsWith('.') || type.startsWith('/') ? type : `${__dirname}/../../configs/nginx/${type}`;
-    template = readFileSync(path).toString();
+    template = type.startsWith('.') || type.startsWith('/') ? readFileSync(type).toString() : (siteTypes[type.toLocaleLowerCase()]);
   } catch (e) {
     throw new Error('Site template does not exist. Either supply a built-in type or a path to a valid nginx template.');
   }
@@ -71,7 +77,15 @@ export function addSite(type: string, name: string, properties: SiteProperties, 
     throw new Error(`Template contains unresolved property: ${parsedTemplate.slice(unresolvedProp+2, unresolvedPropEnd)}`)
   }
 
-  writeFileSync(configFile, parsedTemplate, {});
+  const extendedProps: any = {
+    ...properties,
+    type,
+    name
+  }
+
+  const addConfig = [parsedTemplate, ``, ...Object.keys(extendedProps).map((key) => `##% ${key}: ${extendedProps[key]}`)].join("\n");
+
+  writeFileSync(configFile, addConfig);
 
   if (!test()) {
     rmSync(configFile);
@@ -81,7 +95,7 @@ export function addSite(type: string, name: string, properties: SiteProperties, 
   if (restartServer) {
     restart();
   }
-
+  
   return true;
 }
 
@@ -96,4 +110,18 @@ export function removeSite(name: string, restartServer: boolean = false): boolea
   }
 
   return true;
+}
+
+export function getSiteInfo(name: string) 
+{
+  const configFile = `${configDir()}/servers/${name}`;
+  if (!existsSync(configFile)) throw new Error('Site does not exist');
+
+  const config = readFileSync(configFile).toString();
+  return config.split("\n")
+               .filter(it => it.startsWith('##%'))
+               .map(it => {
+                const values = it.split(' ');
+                return [values[1].replace(':',''), values.slice(2).join(' ')]
+               });
 }

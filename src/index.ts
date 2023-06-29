@@ -1,8 +1,9 @@
 import * as php from "./services/php";
 import * as nginx from "./services/nginx";
-import * as hosts from './hosts';
-import * as manager from './manager';
+import * as hosts from './services/hosts';
+import * as drush from './services/drush';
+import * as mariadb from './services/mariadb';
 
 export {
-  php, nginx, hosts, manager
+  php, nginx, hosts, drush, mariadb
 }

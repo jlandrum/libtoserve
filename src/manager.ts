@@ -1,81 +1,102 @@
-import { HostEntry } from "./hosts";
-import { nginx, hosts } from ".";
-import { readFileSync } from "fs";
-import { SiteProperties } from "./services/nginx";
+// import { nginx, hosts } from ".";
+// import { readFileSync } from "fs";
+// import { SiteProperties } from "./services/nginx";
+// import { HostEntry } from "./services/hosts";
 
-export class Server {
-  host?: HostEntry;
-  site: string;
-  url?: string;
+// export class Server {
+//   site: string;
+//   host: string;
+//   info: any;
 
-  constructor(site: string, url?: string, host?: HostEntry)
-  {
-    this.host = host;
-    this.site = site;
-    this.url = url;
-  }
+//   constructor(site: string, host: string)
+//   {
+//     this.site = site;
+//     this.host = host;
+//   }
 
-  valid() 
-  {
-    return !!this.host && !!this.site;
-  }
+//   valid() 
+//   {
+//     return !!this.site;
+//   }
 
-  enable()
-  {
-    if (!this.url) {
-      throw new Error('Site could not be configured - could not identify a valid hostname');
-    }
-    hosts.addHost('127.0.0.1', this.url, this.site, 'LibToServe');
-  }
+//   enable()
+//   {
+//     if (!this.host) {
+//       throw new Error('Site could not be configured - could not identify a valid hostname');
+//     }
+//     // hosts.addHost('127.0.0.1', this.host, this.site, 'LibToServe');
+//   }
 
-  disable()
-  {
-    if (!this.host) {
-      throw new Error('Site could not be configured - could not identify a unique identifier');
-    }
-    hosts.removeHostByComment(this.host.comment || '');
-  }
+//   disable()
+//   {
+//     hosts.removeHost('127.0.0.1', this.host);
+//   }
 
-  destroy()
-  {
-    if (this.host) {
-      this.disable();
-    }
-    nginx.removeSite(this.site);
-  }
-}
+//   destroy()
+//   {
+//     this.disable();
+//     nginx.removeSite(this.site);
+//   }
+// }
 
-export function listServers() 
-{
-  const sites = nginx.getSites();
-  const hostList = hosts.getHosts('LibToServe');
+// export function listServers() 
+// {
+//   const sites = nginx.getSites();
 
-  const confDir = `${nginx.configDir()}/servers`;
+//   if (!sites) {
+//     throw new Error('No sites available.');
+//   }
 
-  if (!sites) {
-    throw new Error('No sites available.');
-  }
+//   return sites.map(getServerInfo).filter(it => it);
+// }
 
-  return sites.map((site) => {
-    const config = readFileSync(`${confDir}/${site}`).toString();
-    const hostConfig = config.split('\n').find(it => it.trim().startsWith('server_name'))?.trim?.();
-    const hostValue = hostConfig?.split?.(' ')?.[1]?.replace?.(';','')?.trim?.();
+// export function getServerInfo(site: string) {
+//   const hostList = hosts.getHostsDef('LibToServe');
+//   const confDir = `${nginx.configDir()}/servers`;
 
-    const host = hostValue ? hostList.find(it => {
-      if (typeof it === 'string') return false;
-      return it.host === hostValue;
-    }) as HostEntry : undefined;
+//   try {
+//     const config = readFileSync(`${confDir}/${site}`).toString();
+//     const hostConfig = config.split('\n').find(it => it.trim().startsWith('server_name'))?.trim?.();
+//     const hostValue = hostConfig?.split?.(' ')?.[1]?.replace?.(';','')?.trim?.();
 
-    return new Server(site, hostValue, host);
-  });
-}
+//     const host = hostValue ? hostList.find(it => {
+//       if (typeof it === 'string') return false;
+//       return it.host === hostValue;
+//     }) as HostEntry : undefined;
 
-export function createServer(type: string, name: string, host: string, properties: SiteProperties)
-{  
-  const addedConf = nginx.addSite(type, name, {...properties, hostName: host});
-  if (!addedConf) {
-    throw new Error('Could not add server');
-  }
-  hosts.addHost('127.0.0.1', host, name, 'LibToServe');
-  nginx.restart();
-}
+//     const siteInfo = nginx.getSiteInfo(site) as any;
+
+//     return new Server(site, siteInfo['hostName']);
+//   } catch {
+//     return null;
+//   }
+// }
+
+// export function createServer(type: string, name: string, host: string, properties: SiteProperties)
+// {  
+//   // const addedConf = nginx.addSite(type, name, {...properties, hostName: host});
+//   // if (!addedConf) {
+//   //   throw new Error('Could not add server');
+//   // }
+//   // hosts.addHost('127.0.0.1', host, name, 'LibToServe');
+//   // nginx.restart();
+//   notifyUpdate();
+// }
+
+// let listeners: (() => void)[] = [];
+
+// export function registerChangeListener(callback: () => void)
+// {
+//   if (listeners.includes(callback)) return;
+//   listeners = [...listeners, callback];
+// }
+
+// export function removeChangeListener(callback: () => void)
+// {
+//   listeners = listeners.filter(it => it != callback);
+// }
+
+// export function notifyUpdate()
+// {
+//   listeners.forEach(it => it());
+// }
