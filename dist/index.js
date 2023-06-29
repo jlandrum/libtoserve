@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.mariadb = exports.drush = exports.hosts = exports.nginx = exports.php = void 0;
+exports.system = exports.mariadb = exports.drush = exports.hosts = exports.nginx = exports.php = void 0;
 const php = __importStar(require("./services/php"));
 exports.php = php;
 const nginx = __importStar(require("./services/nginx"));
@@ -34,3 +34,5 @@ const drush = __importStar(require("./services/drush"));
 exports.drush = drush;
 const mariadb = __importStar(require("./services/mariadb"));
 exports.mariadb = mariadb;
+const system = __importStar(require("./services/system"));
+exports.system = system;

@@ -14,7 +14,7 @@ server {
 
   location ~ \.php$ {
     include fastcgi_params;
-    fastcgi_pass  127.0.0.1:9000;
+    fastcgi_pass  127.0.0.1:{{phpfpmPort}};
     fastcgi_read_timeout 2400;
     fastcgi_param PATH_INFO       $fastcgi_path_info;
     fastcgi_param PATH_TRANSLATED $document_root$fastcgi_path_info;

@@ -1,6 +1,6 @@
 {
   "name": "libtoserve",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "A library and command line tool that facilitates creating and running locally-hosted development servers",
   "main": "dist/index.js",
   "author": "James Landrum",

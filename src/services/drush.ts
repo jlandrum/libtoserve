@@ -1,20 +1,17 @@
-import { spawn } from "child_process";
-import { execParams, execute, noop } from "../util";
+import { execute } from "../util";
 
-export interface Controller {
-  stop: typeof noop;
-}
-
-export interface ExecProc<T> {
-  promise: Promise<T>;
-  controller: Controller; 
-}
-
+/**
+ * Executes a drush task.
+ * @param root The root path of the site on the system
+ * @param command The command to run
+ * @param onData If supplied, the task will be created as an ongoing task
+ * @returns 
+ */
 export const exec = (root: string, 
-                       command: string,
-                       onData: (data: string) => void) =>
+                     command: string,
+                     onData?: (data: string) => void) =>
   execute('drush', {
-    ongoing: true,
+    noCapture: !!onData,
     args: [...command.split(' '), `--root=${root}`],
     onData
   });
@@ -27,19 +24,16 @@ export const exec = (root: string,
 export const getSiteInfo = async (root: string): Promise<string> => 
   execute<string>('drush', {
     args: ['status', '--format=json', `--root=${root}`],
-    process: (response) => {
-      return response.split(' ')[3].trim();
-    }
-  }).task;
+  }).task.then((response) => response.split(' ')[3].trim());
 
 /**
  * Fetches the currently installed Drush version
  * @returns The version of the Drush CLI if installed
  * @throws If Drush is not installed
  */
-export const getVersion = async (): Promise<string> => 
+export const getVersion = async (): Promise<string|undefined> => 
   execute<string>('drush', {
     ignoreCode: true,
     args: ['--version'],
-    process: (response) => response.split('\n')[0].split(' ')[3].trim()
-  }).task;
+  }).task.then((response) => response.split('\n')[0].split(' ')[3].trim())
+         .catch(() => undefined);

@@ -1,177 +1,110 @@
-import { readFileSync, writeFileSync } from 'fs';
+import { readFile, writeFile } from "fs/promises";
 import sudo from 'sudo-prompt';
 
-export type HostComment = string;
-export type HostLine = (HostEntry|HostComment);
+const IPRegex = new RegExp(`((^\s*((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))\s*$)|(^\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*$))`);
+const HostRegex = new RegExp(`[-.0-9a-z]+`);
 
-export class HostEntry {
-  readonly address: string;
-  readonly host : string;
-  readonly comment?: string;
+/**
+ * Gets the host file and converts it to an array of strings, each string
+ * representing a line of the hosts file.
+ * @returns The host file as an array of lines.
+ */
+export const getHostFile = () => new Promise<string[]>(async (res,rej) => {
+  const buffer = await readFile('/etc/hosts');
 
-  constructor(address: string, host: string, comment?: string) 
-  {
-    this.address = address;
-    this.host = host;
-    this.comment = comment?.startsWith('#') ? comment.slice(1) : comment;
-  }
-
-  toString()
-  {
-    return `${this.address} ${this.host}${this.comment ? ` # ${this.comment}` : ''}`;
-  }
-
-  static parse(entry: string) 
-  {
-    const parsed = entry.trim().split(/\s+/g).map(it => it.trim());
-    if (parsed.length < 2) {
-      throw new Error(`Host definition is not valid: ${entry}`);
-    }
-
-    const address = parsed[0];
-    const host = parsed[1];
-    const comment = parsed.slice(2).join(' ');
-    return new HostEntry(address, host, comment ? comment : undefined);
-  }
-}
-
-export function getHostsDef(inSection?: string): HostLine[]
-{
-  const buffer = readFileSync('/etc/hosts');
   if (!buffer) {
-    throw Error('Hosts file does not exist or could not be read.');
+    rej('Hosts file does not exist or could not be read.');
+    return;
   }
 
-  const text = buffer.toString();    
-  const lines = text.split('\n');
+  res(buffer.toString().split('\n'));
+});
 
-  const entries = lines.map((entry) => {
-    if (entry.startsWith('#')) {
-      return entry as HostComment;
-    } else if (!entry.trim()) {
-      return "";
-    } else {
-      return HostEntry.parse(entry);
-    }
-  })
-
-  if (inSection) {
-    const start = entries.findIndex(it => {
-      if (typeof it === "string") {
-        return it.trim().startsWith(`## ${inSection} ##`);
-      }
-      return false;
-    })    
-    
-    const stop = entries.findIndex(it => {
-      return typeof it === "string" 
-        ? it.trim().startsWith(`## ${inSection} - End ##`) 
-        : false;
+/**
+ * Gets the line in the hosts file that matches the given host
+ * @param host The host to look for
+ * @returns The line in the hosts file if found, otherwise undefined
+ */
+export const getHost = (host: string) => new Promise(async (res, rej) => {
+  getHostFile()
+    .then((hosts) => {
+      const line = hosts.find((str) => {
+        const components = str.split(/\s+/).filter(s=>s);
+        if (components.length >= 2) {
+          return components[1] === host;
+        }
+      });
+      res(line);
     })
+    .catch(rej);
+});
 
-    if (start === -1 || stop === -1) {
-      return [];
-    }
+/**
+ * Adds a new host file entry, if it exists.
+ * @param host The host entry to add
+ * @param address The address to point the host to.
+ * @param comment A comment to add to the entry
+ * @returns A promise
+ */
+export const addHost = (host: string, address: string, comment?: string) => new Promise(async (res, rej) => {
+  const hostExists = await getHost(host);
 
-    return entries.slice(start, stop) as (HostLine)[];
+  if (!!hostExists) {
+    rej('Host already exists');
+    return;
   }
-  return entries as (HostLine)[];
-}
 
-export function getHosts(inSection?: string): HostEntry[]
-{
-  return getHostsDef(inSection).filter((it): it is HostEntry => typeof it !== 'string');  
-}
+  if (!IPRegex.test(address)) {
+    rej('Address is not a valid IP address');
+    return;
+  }
 
-export function getHost(host: string)
-{
-  return getHostsDef().find(it => {
-    return typeof it !== 'string' 
-      ? it.host === host 
-      : false
-  });
-}
+  if (!HostRegex.test(host)) {
+    rej('Host is not a valid hostname')
+    return;
+  }
 
-export function toHostsString(items: HostLine[]) 
-{
-  return items.map(it => it.toString().trim()).join("\n");
-}
-
-export async function writeHosts(hosts: HostLine[]): Promise<boolean>
-{
-  const promise = new Promise<boolean>((res, rej) => {
-    const output = toHostsString(hosts);
-    writeFileSync('/tmp/hosts', output);
-    sudo.exec('cp /tmp/hosts /etc/hosts', {
-      name: 'libtoserve'
-    }, function(err,stdout,stderr) {
-      err ? rej(err) : res(true)
-    });
-  });
-  return promise;
-}
-
-export async function addHost(address: string, host: string, comment?: string, section?: string)
-{
-  const hosts = getHostsDef();
-  const entry = new HostEntry(address, host, comment);
-
-  const existing = hosts.find(it => {
-    if (typeof it === "string") return false;
-    return it.host === host;
-  });
-
-  if (existing) return false;
-
-  if (section) {
-    const startIndex = hosts.findIndex((v) => {
-      if (typeof v !== "string") return false;
-      if (v.startsWith(`## ${section} ##`)) return true;
-      return false;
-    })      
-    
-    const stopIndex = hosts.findIndex((v) => {
-      if (typeof v !== "string") return false;
-      if (v.startsWith(`## ${section} - End ##`)) return true;
-      return false;
+  getHostFile()
+    .then((hosts) => {
+      const newHosts = hosts.concat(`${address} ${host}${comment ? ` #${comment}`:''}`).join('\n');
+      writeHostFile(newHosts).then(res).catch(rej);
     })
+});
 
-    if (startIndex !== -1 && stopIndex !== -1) {
-      const newHosts = [...hosts.slice(0, stopIndex), entry, ...hosts.slice(stopIndex)];
-      return writeHosts(newHosts);
-    } else if (startIndex != stopIndex) {
-      throw new Error('Section does not match expected format.');
-    } else {
-      return writeHosts([...hosts, `## ${section} ##`, entry, `## ${section} - End ##`]);
-    }
-  } else {
-    return writeHosts([...hosts, entry]);
+/**
+ * Removes the specified host from the hosts file, if it exists.
+ * @param host The host to remove
+ * @returns A promise
+ */
+export const removeHost = (host: string) => new Promise(async(res, rej) => {
+  const hostToRemove = await getHost(host);
+
+  if (!hostToRemove) {
+    rej('Host does not exists');
+    return;
   }
-}
 
-export async function removeHost(address: string, host: string): Promise<boolean>
-{
-  const hosts = getHostsDef();
-  const filtered = hosts.filter(it => {
-    return typeof it === "string" 
-      ? true 
-      : !(it.address === address && it.host === host);
-  });
+  getHostFile()
+    .then((hosts) => {
+      const newHosts = hosts.filter((entry) => entry !== hostToRemove).join('\n') + '\n';
+      writeHostFile(newHosts).then(res).catch(rej);
+    })
+});
 
-  if (filtered.length === hosts.length) return false;
-  return writeHosts(filtered);
-}
+/**
+ * Writes the host file
+ * @param content The content to write
+ * @returns A promise
+ */
+export const writeHostFile = (content: string) => new Promise((res,rej) => {
+  writeFile('/tmp/hosts', content)
+    .then(() => {
+      sudo.exec('cp /tmp/hosts /etc/hosts', {
+        name: 'libtoserve'
+      }, function(err) {
+        err ? rej(err) : res(true)
+      });
+    })
+    .catch(rej);
+});
 
-export function removeHostByComment(comment: string): boolean
-{
-  const hosts = getHostsDef();
-  const filtered = hosts.filter(it => {
-    if (typeof it === "string") return true;
-    return !(it.comment === comment);
-  });
-
-  if (filtered.length === hosts.length) return false;
-  writeHosts(filtered);
-
-  return true;
-}

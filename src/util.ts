@@ -7,24 +7,28 @@ export const execParams = {
 }
 
 export interface ExecuteArgs {
+  // The arguments to pass
   args?: string[];
+  // Params to pass to spawn
   params?: any;
-  process?: (data: string) => string;
   
+  // If true, the promise will resolve even if a non-zero error code is returned
   ignoreCode?: boolean;
-  ongoing?: boolean;
+  // If true, the data will be streamed but not captured, and the promise will return undefined
+  noCapture?: boolean;
 
+  // Captures the data from the process' STDOUT
   onData?: (data: string) => void;
+  // Captures the data from the process' STDERR
   onError?: (data: string) => void;
 }
 
-export interface Task<T> {
-  task: Promise<T>;
-  cancel: () => void;
-}
-
+/**
+ * A utility class that mimics a promise but allows a cancel handler to be specified.
+ * onCancel should be called and if otherwise unhandled, should resolve the promise.
+ */
 export class CancellablePromise<T> {
-  readonly task: Promise<T>;
+  task: Promise<T | any>;
   readonly doCancel: () => void;
 
   constructor(exec: (res: (value: T | PromiseLike<T>) => void, 
@@ -41,12 +45,12 @@ export class CancellablePromise<T> {
     return this.doCancel();
   }
 
-  public then(onfulfilled?: ((value: T) => T | PromiseLike<T>) | null | undefined, onrejected?: ((reason: any) => PromiseLike<never>) | null | undefined) {
-    this.task.then(onfulfilled, onrejected);
+  public then(onfulfilled?: ((value?: T | any) => T | PromiseLike<T> | null | undefined | void), onrejected?: ((reason?: any) => PromiseLike<never>) | null | undefined) {
+    this.task = this.task.then(onfulfilled, onrejected);
     return this;
   }
 
-  public catch(onrejected?: ((reason: any) => PromiseLike<never>) | null | undefined) {
+  public catch(onrejected?: ((reason?: any) => PromiseLike<never> | null | undefined | void)) {
     this.task.catch(onrejected);
     return this;
   }
@@ -57,8 +61,14 @@ export class CancellablePromise<T> {
   }
 }
 
-export function execute<T,>(command: string,
-                            args: ExecuteArgs): Task<T> {
+/**
+ * 
+ * @param command The command to run
+ * @param args A configuration object that describes how to run the process
+ * @returns A CancellablePromise in which the cancel method will send a SIGTERM to the process.
+ */
+export function execute<T = string,>(command: string,
+                            args: ExecuteArgs): CancellablePromise<T> {
   const promise = new CancellablePromise<T>((res,rej, onCancel) => {
     let response = '';
     let error = '';
@@ -75,7 +85,7 @@ export function execute<T,>(command: string,
 
     proc.stdout.on('data', (data) => {
       const str = data.toString();
-      if (!args.ongoing) {
+      if (!args.noCapture) {
         response += str;
       }
       args.onData?.(str);
@@ -89,7 +99,7 @@ export function execute<T,>(command: string,
  
     proc.on('close', (code) => {
       if (!hasError && (args.ignoreCode || !code)) {
-        res((args.ongoing ? undefined : (args.process?.(response) || response)) as T);
+        res((args.noCapture ? undefined : (response || error)) as T);
       } else {
         rej(error || response);
       }
