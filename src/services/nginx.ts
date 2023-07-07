@@ -82,10 +82,10 @@ export const addSite = (type: typeof siteTypes | string,
                         name: string,
                         properties: SiteProperties,
                         restartServer: boolean = false) => new Promise(async (res, rej) => {
-  const configFile = `${configDir()}/servers/${name}`;
+  const configFile = `${await configDir()}/servers/${name}`;
   let template = '';
 
-  const allProps: any = {...defaultProps, properties};
+  const allProps: any = {...defaultProps, ...properties};
 
   try {
     template = type.startsWith('.') || type.startsWith('/') ? readFileSync(type).toString() : (siteTypes[type.toLocaleLowerCase()]);

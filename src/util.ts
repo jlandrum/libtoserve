@@ -74,13 +74,13 @@ export function execute<T = string,>(command: string,
     let error = '';
     let hasError = false;
     
-    const proc = spawn(command, args.args, {...execParams, ...args.params})
+    const proc = spawn(command, args.args, {...execParams, ...args.params })
     
     onCancel(() => proc.kill());
 
-    proc.on('error', () => {
+    proc.on('error', (e) => {
       hasError = true;
-      error = 'Command not found';
+      error = e.message;
     });
 
     proc.stdout.on('data', (data) => {

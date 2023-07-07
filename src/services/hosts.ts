@@ -20,18 +20,28 @@ export const getHostFile = () => new Promise<string[]>(async (res,rej) => {
   res(buffer.toString().split('\n'));
 });
 
+export const getHosts = (group?: string) => new Promise<any[]>(async (res,rej) => {
+  const hosts = await getHostFile();
+  const start = group ? hosts.indexOf(`## ${group} ##`) : 0;
+  const end = group ? hosts.indexOf(`## ${group} - End ##`) : hosts.length;
+  
+  const list = hosts.slice(start, end).filter(it => !it.trim().startsWith('#'));
+
+  res(list);
+});
+
 /**
  * Gets the line in the hosts file that matches the given host
  * @param host The host to look for
  * @returns The line in the hosts file if found, otherwise undefined
  */
-export const getHost = (host: string) => new Promise(async (res, rej) => {
+export const getHost = (host: string, address?: string) => new Promise<string|undefined>(async (res, rej) => {
   getHostFile()
     .then((hosts) => {
       const line = hosts.find((str) => {
         const components = str.split(/\s+/).filter(s=>s);
         if (components.length >= 2) {
-          return components[1] === host;
+          return components[1] === host && (address ? components[0] === address : true);
         }
       });
       res(line);
@@ -46,8 +56,9 @@ export const getHost = (host: string) => new Promise(async (res, rej) => {
  * @param comment A comment to add to the entry
  * @returns A promise
  */
-export const addHost = (host: string, address: string, comment?: string) => new Promise(async (res, rej) => {
-  const hostExists = await getHost(host);
+export const addHost = (host: string, address: string, comment?: string, group?: string) => new Promise(async (res, rej) => {
+  const hostExists = await getHost(host, address);
+  let newGroup = false;
 
   if (!!hostExists) {
     rej('Host already exists');
@@ -64,11 +75,21 @@ export const addHost = (host: string, address: string, comment?: string) => new 
     return;
   }
 
-  getHostFile()
-    .then((hosts) => {
-      const newHosts = hosts.concat(`${address} ${host}${comment ? ` #${comment}`:''}`).join('\n');
-      writeHostFile(newHosts).then(res).catch(rej);
-    })
+  const hosts = await getHostFile();
+  let insertPoint = group ? hosts.indexOf(`## ${group} - End ##`) : hosts.length;
+
+  if (insertPoint == -1) {
+    newGroup = true;
+    insertPoint = hosts.length;
+  }
+
+  const newHosts = [...hosts.slice(0, insertPoint),
+                    ...(newGroup ? [`## ${group} ##`] : []),
+                    `${address} ${host}${comment ? ` #${comment}`:''}`,
+                    ...(newGroup ? [`## ${group} - End ##`] : []),
+                    ...hosts.slice(insertPoint)];
+
+  writeHostFile(newHosts.join('\n')).then(res).catch(rej);
 });
 
 /**
@@ -76,8 +97,8 @@ export const addHost = (host: string, address: string, comment?: string) => new 
  * @param host The host to remove
  * @returns A promise
  */
-export const removeHost = (host: string) => new Promise(async(res, rej) => {
-  const hostToRemove = await getHost(host);
+export const removeHost = (host: string, address?: string) => new Promise(async(res, rej) => {
+  const hostToRemove = await getHost(host, address);
 
   if (!hostToRemove) {
     rej('Host does not exists');
@@ -86,9 +107,30 @@ export const removeHost = (host: string) => new Promise(async(res, rej) => {
 
   getHostFile()
     .then((hosts) => {
-      const newHosts = hosts.filter((entry) => entry !== hostToRemove).join('\n') + '\n';
+      const newHosts = hosts.filter((entry) => entry !== hostToRemove).join('\n');
       writeHostFile(newHosts).then(res).catch(rej);
     })
+});
+
+/**
+ * Removes the specified host group from the hosts file, if it exists.
+ * @param host The host group to remove
+ * @returns A promise
+ */
+export const removeHostGroup = (group: string) => new Promise(async(res, rej) => {
+  const hosts = await getHostFile();
+
+  const start = group ? hosts.indexOf(`## ${group} ##`) : -1;
+  const end = group ? hosts.indexOf(`## ${group} - End ##`) : -1;
+
+  if (start === -1 || end === -1) {
+    rej('Group does not exist');
+    return;
+  }
+
+  const newHosts = [...hosts.slice(0, start), ...hosts.slice(end+1)];
+
+  writeHostFile(newHosts.join('\n')).then(res).catch(rej);
 });
 
 /**

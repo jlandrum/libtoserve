@@ -1,8 +1,9 @@
-import mariadb from "mariadb";
+import mariadb, { Pool } from "mariadb";
 import { execute } from "../util";
-import { exists, existsSync } from "fs";
 
-export const createPool = (host: string = 'localhost', user: string = 'root', password: string = '') => 
+export type DbPool = Pool;
+
+export const createPool = (host: string = 'localhost', user: string = 'root', password: string = ''): DbPool => 
   mariadb.createPool({ host, user, password });
 
 /**
@@ -45,15 +46,11 @@ export const createDatabase = (pool: mariadb.Pool, name: string) => new Promise(
  * @returns A promise that resolves if the drop was successful, rejects otherwise
  */
 export const dropDatabase = (pool: mariadb.Pool, name: string) => new Promise(async (res, rej) => {
-  let conn;
   try {
-    conn = await pool.getConnection();
-    const result = await conn.query(`DROP DATABASE ${name}`);
+    const result = await pool.query(`DROP DATABASE ${name}`);
     res(result);
   } catch(reason) {
     rej(reason);
-  } finally {
-    conn?.release();
   }
 });
 
@@ -61,7 +58,7 @@ export const dropDatabase = (pool: mariadb.Pool, name: string) => new Promise(as
  * Gets all databases
  * @returns A promise that resolves to a list of databases, rejects otherwise
  */
-export const listDatabases = (pool: mariadb.Pool) => new Promise(async (res, rej) => {
+export const listDatabases = (pool: mariadb.Pool) => new Promise<string[]>(async (res, rej) => {
   let conn;
   try {
     conn = await pool.getConnection();
@@ -159,10 +156,7 @@ export const insertDump = (db: string, file: string) => {
  */
 export const insertDumpSql = (db: string, file: string) => execute('sh', {
   args: ['-c', `cat ${file} | mariadb -u root -f ${db}`],
-  params: {
-    shell: false,
-    stdio: ['ignore', 'inherit', 'inherit']
-  }
+  params: {}
 })
 
 // TODO: Currently requires an empty password root account
@@ -174,8 +168,5 @@ export const insertDumpSql = (db: string, file: string) => execute('sh', {
  */
 export const insertDumpGz = (db: string, file: string) => execute('sh', {
   args: ['-c', `gzcat ${file} | mariadb -u root -f ${db}`],
-  params: {
-    shell: false,
-    stdio: ['ignore', 'inherit', 'inherit']
-  }
+  params: {}
 })

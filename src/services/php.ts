@@ -92,7 +92,10 @@ export const getVersions = (extended: boolean = false) => new Promise<PHPVersion
  */
 export const installVersion = (version: string) => {
   const runner = execute('brew', {
-    args: ['install', `shivammathur/php/php@${version}`]
+    args: ['install', `shivammathur/php/php@${version}`],
+    params: {
+      shell: true
+    }
   });
   runner.task.then(updateConfig);
   return runner;

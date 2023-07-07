@@ -80,3 +80,11 @@ export const checkHomebrew = () => new Promise(async (res) => {
 export const getBrewDir = () => execute<string>('brew', {
   args: ['--prefix']
 }).task.then((path) => path.trim());
+
+export const unzip = (file: string, to: string) => execute('unzip', {
+  args: [file, '-d', to]
+}).task;
+
+export const untar = (file: string, to: string) => execute('tar', {
+  args: ['xvzf', file, '-C', to]
+}).task;

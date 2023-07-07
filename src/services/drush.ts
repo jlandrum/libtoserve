@@ -21,10 +21,12 @@ export const exec = (root: string,
  * @param root The root path of the site on the system
  * @returns The Drush siteinfo in JSON format, or the error if the site was not found.
  */
-export const getSiteInfo = async (root: string): Promise<string> => 
+export const getSiteInfo = async (root: string, uri?: string): Promise<string> => 
   execute<string>('drush', {
-    args: ['status', '--format=json', `--root=${root}`],
-  }).task.then((response) => response.split(' ')[3].trim());
+    args: ['status', '--format=json', `--root=${root}`, uri ? `--uri=${uri}` : ''],
+    params: {
+    }
+  }).task.then(JSON.parse);
 
 /**
  * Fetches the currently installed Drush version
